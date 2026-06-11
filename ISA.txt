@@ -1,0 +1,191 @@
+00 - Memory operation
+
+MOV (00 00) 1--- 2--- [4 shift magnitude] [2 shift type]
+// copy value from register to register with optional shift
+// shift type 00 = no shift, 01 = logical left, 10 = logical right, 11 = arithmetic right
+// shift magnitude 0-15
+1.FROM // source register (R0-R7)
+000 - REG0
+001 - REG1
+010 - REG2
+011 - REG3
+100 - REG4
+101 - REG5
+110 - REG6
+111 - REG7
+2.TO // destination register (R0-R7)
+000 - REG0
+001 - REG1
+010 - REG2
+011 - REG3
+100 - REG4
+101 - REG5
+110 - REG6
+111 - REG7
+
+STORE (00 01) 1--- 2--- // write register value to RAM
+1.TO // register whose value is used as RAM address
+000 - REG0 ... 111 - REG7
+2.FROM // register whose value will be written to RAM
+000 - REG0 ... 111 - REG7
+
+LOAD (00 10) 1--- 2--- // read value from RAM into register
+1.FROM // register whose value is used as RAM address
+000 - REG0 ... 111 - REG7
+2.TO // register where loaded value will be stored
+000 - REG0 ... 111 - REG7
+
+MOV H/L (00 11) (1 - H / 0 - L) 1-------- 2---
+// load immediate 8-bit value into high or low byte of register
+// H=1 writes to bits 15-8, L=0 writes to bits 7-0
+// use MOV H then MOV L to load full 16-bit constant
+1.DATA // 8-bit immediate value to load
+2.TO // destination register (R0-R7)
+000 - REG0 ... 111 - REG7
+
+01 - ALU operations
+// performs operation on ARG1 and ARG2, writes result to RESULT
+// automatically updates FLAGS after every operation
+// MUL and DIV do not use RESULT field — they write to BANK2.REG0/REG1
+
+OPCODE ARG1 ARG2 RESULT
+01---- 2--- 3--- 4---
+
+1.OPCODE
+AND      (01 0000) // bitwise AND
+NAND     (01 0001) // bitwise NOT AND
+NOR      (01 0010) // bitwise NOT OR
+OR       (01 0011) // bitwise OR
+XOR      (01 0100) // bitwise exclusive OR
+XNOR     (01 0101) // bitwise exclusive NOR
+MUL      (01 0110) // multiply ARG1*ARG2 → BANK2.REG0(low), BANK2.REG1(high)
+DIV      (01 0111) // divide ARG1/ARG2 → BANK2.REG0(quotient), BANK2.REG1(remainder)
+ADD      (01 1000) // add ARG1 + ARG2
+SUB      (01 1001) // subtract ARG1 - ARG2
+ADC      (01 1010) // add ARG1 + ARG2 + CF (for 32-bit addition)
+SBB      (01 1011) // subtract ARG1 - ARG2 - CF (for 32-bit subtraction)
+CMP      (01 1100) // compare ARG1 and ARG2, update FLAGS only
+GETF     (01 1101) // copy FLAGS register into RESULT
+SETF     (01 1110) // load ARG1 value into FLAGS register
+NOP      (01 1111) // no operation
+
+2.ARG1  000-REG0 ... 111-REG7
+3.ARG2  000-REG0 ... 111-REG7
+4.RESULT 000-REG0 ... 111-REG7 (unused by MUL and DIV)
+
+10 - BU operations
+// branch unit: compares two registers and jumps if condition is met
+// jump = set PC to value stored in JUMP register
+
+10 [3 opcode] [1 S] [1 R] [3 ARG1] [3 ARG2] [3 JUMP]
+S = 0 ← signed comparison   (uses SF and OF flags)
+S = 1 ← unsigned comparison (uses CF flag)
+R = reserved
+
+BEQ (10 000) [S][0] [ARG1] [ARG2] [JUMP] // jump if ARG1 == ARG2
+BNE (10 001) [S][0] [ARG1] [ARG2] [JUMP] // jump if ARG1 != ARG2
+BLT (10 010) [S][0] [ARG1] [ARG2] [JUMP] // jump if ARG1 < ARG2
+BLE (10 011) [S][0] [ARG1] [ARG2] [JUMP] // jump if ARG1 <= ARG2
+BGT (10 100) [S][0] [ARG1] [ARG2] [JUMP] // jump if ARG1 > ARG2
+BGE (10 101) [S][0] [ARG1] [ARG2] [JUMP] // jump if ARG1 >= ARG2
+
+CAL (10 110) [0][0] [3 ARG] [000] [000]
+// call function at address stored in ARG register
+// saves COUNTER, FLAGS, BANK1(REG0-REG7) into hardware stack buffer
+
+RET (10 111) [0][0] [000] [000] [000]
+// return from function
+// restores COUNTER, FLAGS, BANK1(REG0-REG7) from hardware stack buffer
+
+ARG1, ARG2, JUMP: 000-REG0 ... 111-REG7
+
+11 - System operations
+
+INT  (11 000) [6 vector] [000]
+// software interrupt vector 0-63
+// saves COUNTER and FLAGS to interrupt stack
+// forces BF=11 (BANK3), disables interrupts
+
+IRET (11 001) [000][000][000]
+// return from interrupt, restores COUNTER+FLAGS, re-enables interrupts
+
+SEI  (11 010) // enable interrupts (IF=1)
+CLI  (11 011) // disable interrupts (IF=0)
+
+SWPB (11 100) [2 BANK] [0000000]
+// switch active register bank: 00=BANK0, 01=BANK1, 10=BANK2
+// 11=BANK3 forbidden
+
+MOVB (11 101) [2 FROM_BANK] [3 FROM_REG] [2 TO_BANK] [3 TO_REG]
+// copy register between banks without switching active bank
+
+SYS  (11 110) [1 R/W] [2 SYSID] [3 REG] [000]
+// read or write a system register (PC or SC)
+// R/W: 0 = read sysreg → REG,  1 = write REG → sysreg
+// SYSID: 00 = SC (stack counter),  01 = PC (program counter)
+//
+// assembler syntax:
+//   SYSR SC R0    ; R0 = SC
+//   SYSR PC R0    ; R0 = PC (current address)
+//   SYSW R0 SC    ; SC = R0
+//   SYSW R0 PC    ; PC = R0  (jump to address in R0)
+
+TAS  (11 111) [3 ADDR_REG] [3 DST_REG] [000]
+// atomic test-and-set
+// DST_REG = RAM[ADDR_REG]   (read old value)
+// RAM[ADDR_REG] = 1          (set lock atomically)
+// ZF = 1 if lock acquired (old value was 0)
+// ZF = 0 if already locked  (retry needed)
+//
+// usage — mutex lock:
+//   lock: TAS Raddr Rdst
+//         BNE Rdst Rdst lock  ; ZF=0 → spin
+//         ; ZF=1 → critical section
+// usage — mutex unlock:
+//         MOVH R0 0x00
+//         MOVL R0 0
+//         STORE R0 Raddr      ; write 0 = release
+
+FLAGS register (16 bit):
+bit 0  - CF   // carry / borrow / div-by-zero
+bit 1  - ZF   // zero
+bit 2  - SF   // sign (bit 15 of result)
+bit 3  - OF   // signed overflow
+bit 4  - IF   // interrupt enable
+bit 5  - BF0  // active bank bit 0 (LSB)
+bit 6  - BF1  // active bank bit 1 (MSB)
+bit 7-15      // reserved
+
+Register banks (each has REG0-REG7):
+BANK0  argument passing / return value (caller-saved, NOT saved by CAL/RET)
+BANK1  callee-saved (automatically saved and restored by CAL/RET)
+BANK2  global storage; REG0=MUL/DIV low, REG1=MUL/DIV high (NOT saved by CAL/RET)
+BANK3  interrupt handler (auto-activated on INT, restored on IRET, forbidden for user)
+
+System registers (accessible only via SYS instruction):
+PC     program counter (shared across all banks)
+SC     stack counter (grows downward; used by CAL/RET spill and INT/IRET)
+
+CAL/RET hardware stack buffer:
+// 40 registers inside CPU = 4 call levels without RAM
+// each entry: COUNTER(1) + FLAGS(1) + BANK1.REG0-REG7(8) = 10 words
+// auto-spills to RAM via SC when full
+
+Calling convention:
+BANK0.R0        argument 1 / return value
+BANK0.R1-R7     arguments 2-8
+BANK1.R0-R7     callee-saved (free to use inside functions)
+BANK2.R0-R7     global variables (not saved across calls)
+
+Interrupt vector table (beginning of RAM):
+RAM[0x0000] - vector 0  // timer 0
+RAM[0x0001] - vector 1  // timer 1
+RAM[0x0002] - vector 2  // UART 0 RX
+RAM[0x0003] - vector 3  // UART 0 TX
+RAM[0x0004] - vector 4  // UART 1 RX
+RAM[0x0005] - vector 5  // UART 1 TX
+RAM[0x0006] - vector 6  // SPI
+RAM[0x0007] - vector 7  // I2C
+RAM[0x0008] - vector 8  // error / fault
+RAM[0x0009-0x003F]      // reserved
+RAM[0x0040]             // start of user program
