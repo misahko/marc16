@@ -149,12 +149,12 @@ Exceptions are synchronous events triggered directly by the CPU pipeline during 
 
 > **Exception Entry Behavior:**
 > When an exception occurs, hardware performs:
-> - $IPC \leftarrow \text{faulting\textunderscore{}instruction\textunderscore{}PC}$ (preserves the exact offending instruction address for diagnostics)
-> - $PMODE \leftarrow \text{MODE}, \quad PIE \leftarrow \text{IE}, \quad \text{PSP\textunderscore{}MODE} \leftarrow \text{SP\textunderscore{}MODE}$
-> - $\text{MODE} \leftarrow 0 \text{ (Kernel)}, \quad \text{IE} \leftarrow 0, \quad \text{SP\textunderscore{}MODE} \leftarrow 0 \text{ (KSP)}$
-> - $\text{SYS\textunderscore{}VEC\textunderscore{}ID} \leftarrow \text{exc\textunderscore{}id} \quad (\text{stored in } \text{CPU\textunderscore{}STATUS}[14:11])$
+> - $IPC \leftarrow \mathrm{faulting{\char95}instruction{\char95}PC}$ (preserves the exact offending instruction address for diagnostics)
+> - $PMODE \leftarrow \text{MODE}, \quad PIE \leftarrow \text{IE}, \quad \mathrm{PSP{\char95}MODE} \leftarrow \mathrm{SP{\char95}MODE}$
+> - $\text{MODE} \leftarrow 0 \text{ (Kernel)}, \quad \text{IE} \leftarrow 0, \quad \mathrm{SP{\char95}MODE} \leftarrow 0 \text{ (KSP)}$
+> - $\mathrm{SYS{\char95}VEC{\char95}ID} \leftarrow \mathrm{exc{\char95}id} \quad (\text{stored in } \mathrm{CPU{\char95}STATUS}[14:11])$
 > - If the CPU was already in Kernel Mode (`MODE == 0`), hardware sets `DOUBLE_FAULT <= 1` in `CPU_STATUS[8]` (Kernel Panic).
-> - $\text{PC} \leftarrow \text{RAM}[0x0000 + \text{exc\textunderscore{}id}]$
+> - $\text{PC} \leftarrow \text{RAM}[0x0000 + \mathrm{exc{\char95}id}]$
 
 ### 2. Hardware Peripheral IRQ Table (`0x0010–0x001F`)
 Peripheral interrupts are asynchronous signals from on-chip peripherals. **100% of these lines are maskable** via `IRQ_MASK[15:0]` and the global `IE` flag:
@@ -173,20 +173,20 @@ Peripheral interrupts are asynchronous signals from on-chip peripherals. **100% 
 
 > **IRQ Entry Behavior:**
 > When an unmasked IRQ triggers (`IE == 1 && (IRQ_PEND & IRQ_MASK) != 0`):
-> - $IPC \leftarrow \text{next\textunderscore{}instruction\textunderscore{}PC}$ (address to resume after interrupt returns)
-> - $PMODE \leftarrow \text{MODE}, \quad PIE \leftarrow \text{IE}, \quad \text{PSP\textunderscore{}MODE} \leftarrow \text{SP\textunderscore{}MODE}$
-> - $\text{MODE} \leftarrow 0 \text{ (Kernel)}, \quad \text{IE} \leftarrow 0, \quad \text{SP\textunderscore{}MODE} \leftarrow 0 \text{ (KSP)}$
-> - $\text{HW\textunderscore{}VEC\textunderscore{}ID} \leftarrow \text{irq\textunderscore{}id} \quad (\text{stored in } \text{CPU\textunderscore{}STATUS}[7:4])$
-> - $\text{PC} \leftarrow \text{RAM}[0x0010 + \text{irq\textunderscore{}id}]$
+> - $IPC \leftarrow \mathrm{next{\char95}instruction{\char95}PC}$ (address to resume after interrupt returns)
+> - $PMODE \leftarrow \text{MODE}, \quad PIE \leftarrow \text{IE}, \quad \mathrm{PSP{\char95}MODE} \leftarrow \mathrm{SP{\char95}MODE}$
+> - $\text{MODE} \leftarrow 0 \text{ (Kernel)}, \quad \text{IE} \leftarrow 0, \quad \mathrm{SP{\char95}MODE} \leftarrow 0 \text{ (KSP)}$
+> - $\mathrm{HW{\char95}VEC{\char95}ID} \leftarrow \mathrm{irq{\char95}id} \quad (\text{stored in } \mathrm{CPU{\char95}STATUS}[7:4])$
+> - $\text{PC} \leftarrow \text{RAM}[0x0010 + \mathrm{irq{\char95}id}]$
 
 ### 3. Software Syscall Table (`0x0020–0x002F`)
 
 Executing `syscall imm4` (`imm4` = `0..15`) atomically performs:
 - $IPC \leftarrow \text{PC} + 1$
 - $PMODE \leftarrow \text{MODE}, \quad PIE \leftarrow \text{IE}$
-- $\text{PSP\textunderscore{}MODE} \leftarrow \text{SP\textunderscore{}MODE}, \quad \text{SP\textunderscore{}MODE} \leftarrow 0 \text{ (KSP)}$
+- $\mathrm{PSP{\char95}MODE} \leftarrow \mathrm{SP{\char95}MODE}, \quad \mathrm{SP{\char95}MODE} \leftarrow 0 \text{ (KSP)}$
 - $\text{MODE} \leftarrow 0 \text{ (Kernel)}, \quad \text{IE} \leftarrow 0$
-- $\text{SYS\textunderscore{}VEC\textunderscore{}ID} \leftarrow \text{imm4} \quad (\text{stored in } \text{CPU\textunderscore{}STATUS}[14:11])$
+- $\mathrm{SYS{\char95}VEC{\char95}ID} \leftarrow \text{imm4} \quad (\text{stored in } \mathrm{CPU{\char95}STATUS}[14:11])$
 and fetches the handler address from `RAM[0x0020 + imm4]` in a single BRAM cycle.
 
 ### Return Mechanism (`reti`)
@@ -195,7 +195,7 @@ Executing `reti` (Kernel Mode only) atomically restores processor state:
 - $\text{PC} \leftarrow \text{IPC}$
 - $\text{MODE} \leftarrow \text{PMODE}$
 - $\text{IE} \leftarrow \text{PIE}$
-- $\text{SP\textunderscore{}MODE} \leftarrow \text{PSP\textunderscore{}MODE}$
+- $\mathrm{SP{\char95}MODE} \leftarrow \mathrm{PSP{\char95}MODE}$
 
 Attempting to execute `reti` while in User Mode triggers **Vector 2 (`Privilege Fault`)**.
 
@@ -594,11 +594,11 @@ To guarantee complete stack isolation between unprivileged applications and the 
 2. **Trap / IRQ / Syscall Entry (User or Kernel → Kernel)**:
    Whenever a hardware IRQ (`IRQ 0..15`), a synchronous CPU exception (Vectors `1..3`: Illegal Instruction, Privilege Fault, MPU Fault), or `syscall 0..15` occurs, hardware atomically executes:
 
-   $$IPC \leftarrow \text{return\textunderscore{}pc} \quad (\text{faulting PC for exceptions; next PC for IRQs; } \text{PC} + 1 \text{ for syscall})$$
+   $$IPC \leftarrow \mathrm{return{\char95}pc} \quad (\text{faulting PC for exceptions; next PC for IRQs; } \text{PC} + 1 \text{ for syscall})$$
 
-   $$PMODE \leftarrow MODE, \quad PIE \leftarrow IE, \quad \text{PSP\textunderscore{}MODE} \leftarrow \text{SP\textunderscore{}MODE}$$
+   $$PMODE \leftarrow MODE, \quad PIE \leftarrow IE, \quad \mathrm{PSP{\char95}MODE} \leftarrow \mathrm{SP{\char95}MODE}$$
 
-   $$MODE \leftarrow 0 \ (\text{Kernel}), \quad IE \leftarrow 0, \quad \text{SP\textunderscore{}MODE} \leftarrow 0 \ (\text{KSP active})$$
+   $$MODE \leftarrow 0 \ (\text{Kernel}), \quad IE \leftarrow 0, \quad \mathrm{SP{\char95}MODE} \leftarrow 0 \ (\text{KSP active})$$
 
    * **Double Fault / Kernel Panic Detection**: If a synchronous CPU exception (Vectors `1..3`) occurs while the CPU is **already in Kernel Mode** (`MODE == 0`), hardware sets the **`DOUBLE_FAULT`** flag (`CPU_STATUS[8] <= 1`) indicating an unrecoverable kernel panic.
 
@@ -631,7 +631,7 @@ To guarantee complete stack isolation between unprivileged applications and the 
 4. **Trap Return (`reti` — Kernel → Previous Mode)**:
    Executing `reti` in Kernel Mode atomically restores processor execution state:
 
-   $$PC \leftarrow IPC, \quad MODE \leftarrow PMODE, \quad IE \leftarrow PIE, \quad \text{SP\textunderscore{}MODE} \leftarrow \text{PSP\textunderscore{}MODE}$$
+   $$PC \leftarrow IPC, \quad MODE \leftarrow PMODE, \quad IE \leftarrow PIE, \quad \mathrm{SP{\char95}MODE} \leftarrow \mathrm{PSP{\char95}MODE}$$
 
    * To launch or switch to a User task, the RTOS scheduler writes the task's user stack pointer to **`CPU_USP` (`0xFF0C`)** (or switches `SP_MODE = 1` and writes `r15`), writes the entry address to **`CPU_IPC` (`0xFF06`)**, sets `PMODE = 1`, `PSP_MODE = 1`, and `PIE = 1` in **`CPU_STATUS` (`0xFF07`)**, and executes `reti`.
    * Attempting to execute `reti` while in User Mode (`MODE == 1`) is intercepted by the decoder and triggers **Vector 2 (`Privilege Fault`)**.
@@ -768,17 +768,17 @@ Manages asynchronous hardware interrupt lines (`IRQ 0..15`), exposes shadow `IPC
 
   **State Transition Logic:**
   * **Entry to Hardware Peripheral IRQ:**
-    $$IPC \leftarrow \text{next\textunderscore{}pc}$$
-    $$PMODE \leftarrow MODE, \quad PIE \leftarrow IE, \quad \text{PSP\textunderscore{}MODE} \leftarrow \text{SP\textunderscore{}MODE}$$
-    $$MODE \leftarrow 0 \ (\text{Kernel}), \quad IE \leftarrow 0, \quad \text{SP\textunderscore{}MODE} \leftarrow 0 \ (\text{KSP active})$$
-    $$\text{HW\textunderscore{}VEC\textunderscore{}ID} \leftarrow \text{irq\textunderscore{}id}$$
+    $$IPC \leftarrow \mathrm{next{\char95}pc}$$
+    $$PMODE \leftarrow MODE, \quad PIE \leftarrow IE, \quad \mathrm{PSP{\char95}MODE} \leftarrow \mathrm{SP{\char95}MODE}$$
+    $$MODE \leftarrow 0 \ (\text{Kernel}), \quad IE \leftarrow 0, \quad \mathrm{SP{\char95}MODE} \leftarrow 0 \ (\text{KSP active})$$
+    $$\mathrm{HW{\char95}VEC{\char95}ID} \leftarrow \mathrm{irq{\char95}id}$$
   * **Entry to Software Syscall / CPU Exception:**
-    $$IPC \leftarrow \text{return\textunderscore{}pc} \quad (\text{faulting PC for exceptions; } \text{PC} + 1 \text{ for syscall})$$
-    $$PMODE \leftarrow MODE, \quad PIE \leftarrow IE, \quad \text{PSP\textunderscore{}MODE} \leftarrow \text{SP\textunderscore{}MODE}$$
-    $$MODE \leftarrow 0 \ (\text{Kernel}), \quad IE \leftarrow 0, \quad \text{SP\textunderscore{}MODE} \leftarrow 0 \ (\text{KSP active})$$
-    $$\text{SYS\textunderscore{}VEC\textunderscore{}ID} \leftarrow imm4 \text{ or } \text{exc\textunderscore{}id}$$
+    $$IPC \leftarrow \mathrm{return{\char95}pc} \quad (\text{faulting PC for exceptions; } \text{PC} + 1 \text{ for syscall})$$
+    $$PMODE \leftarrow MODE, \quad PIE \leftarrow IE, \quad \mathrm{PSP{\char95}MODE} \leftarrow \mathrm{SP{\char95}MODE}$$
+    $$MODE \leftarrow 0 \ (\text{Kernel}), \quad IE \leftarrow 0, \quad \mathrm{SP{\char95}MODE} \leftarrow 0 \ (\text{KSP active})$$
+    $$\mathrm{SYS{\char95}VEC{\char95}ID} \leftarrow imm4 \text{ or } \mathrm{exc{\char95}id}$$
   * **Exit via `reti` (Kernel Mode only):**
-    $$PC \leftarrow IPC, \quad MODE \leftarrow PMODE, \quad IE \leftarrow PIE, \quad \text{SP\textunderscore{}MODE} \leftarrow \text{PSP\textunderscore{}MODE}$$
+    $$PC \leftarrow IPC, \quad MODE \leftarrow PMODE, \quad IE \leftarrow PIE, \quad \mathrm{SP{\char95}MODE} \leftarrow \mathrm{PSP{\char95}MODE}$$
 
 * **`CPU_USP` (`0xFF0C`)**: User Stack Pointer MMIO mirror window (Kernel Mode only). Allows the RTOS kernel to read or write `USP` (`r15_user`) directly via `ld`/`st` while keeping `SP_MODE == 0` (`KSP`), avoiding any need to toggle `SP_MODE` when initializing or switching tasks.
 
@@ -787,7 +787,7 @@ Manages asynchronous hardware interrupt lines (`IRQ 0..15`), exposes shadow `IPC
 Isolates unprivileged User tasks (`MODE == 1`) in an RTOS so a buggy task or stack overflow cannot corrupt the kernel, vector tables, peripheral registers, or other tasks:
 
 * **Active Condition**: Hardware protection is enforced whenever the CPU is in **User Mode (`MODE == 1`)**. In Kernel Mode (`MODE == 0`) the CPU has unrestricted access to all memory and MMIO, without needing to clear `MPU_CTRL[0]`.
-* **Instruction Fetch Protection (IF Stage)**: In User Mode (`MODE == 1`), the fetched instruction address (`PC`) is bounded by `[MPU_BASE .. MPU_LIMIT]`: violation = $(PC < \text{MPU\textunderscore{}BASE}) \lor (PC > \text{MPU\textunderscore{}LIMIT})$. Any attempt to execute instructions outside this range (e.g. jumping to kernel vectors or unmapped RAM) suppresses fetch and traps to **Vector 3 (`MPU / MMIO Fault`)** before execution.
+* **Instruction Fetch Protection (IF Stage)**: In User Mode (`MODE == 1`), the fetched instruction address (`PC`) is bounded by `[MPU_BASE .. MPU_LIMIT]`: violation = $(PC < \mathrm{MPU{\char95}BASE}) \lor (PC > \mathrm{MPU{\char95}LIMIT})$. Any attempt to execute instructions outside this range (e.g. jumping to kernel vectors or unmapped RAM) suppresses fetch and traps to **Vector 3 (`MPU / MMIO Fault`)** before execution.
 * **MMIO Protection**: Any read or write (`ld`, `st`, `push`, `pop`, `xchg`) targeting `0xFF00–0xFFFF` while `MODE == 1` is unconditionally blocked and triggers **Vector 3 (`0x0003`)**.
 * **RAM Write Bounds**: When `MODE == 1` and `MPU_CTRL[0] (MPU_EN) == 1`, hardware combinational comparators check every memory write (`st`, `push`, `xchg`) against `[MPU_BASE .. MPU_LIMIT]`: violation = (mem_addr < MPU_BASE) ∨ (mem_addr > MPU_LIMIT)
   *(Requirement: the RTOS kernel must configure `MPU_BASE >= 0x0030` so User tasks cannot overwrite the Exception (`0x0000–0x000F`), Hardware IRQ (`0x0010–0x001F`) or Syscall (`0x0020–0x002F`) vector tables.)*
@@ -1005,7 +1005,7 @@ To avoid pipeline stalls when an instruction depends on the result of a precedin
 #### B. Load-Use Delay (1-Cycle Hardware Interlock)
 Because memory read data is only available at the end of the `MEM` stage (after Port B BSRAM read latency), an instruction in `ID` that requires data loaded by an immediately preceding `ld` or `pop` cannot be resolved solely via forwarding:
 * **Interlock Condition**:
-  $$(\text{ID\textunderscore{}reads\textunderscore{}Rs} \ \land \ (\text{ID\textunderscore{}Rs} == \text{EX\textunderscore{}Rd})) \quad \lor \quad (\text{ID\textunderscore{}reads\textunderscore{}Rd} \ \land \ (\text{ID\textunderscore{}Rd} == \text{EX\textunderscore{}Rd})) \quad (\text{when EX instruction is } ld \text{ or } pop)$$
+  $$(\mathrm{ID{\char95}reads{\char95}Rs} \ \land \ (\mathrm{ID{\char95}Rs} == \mathrm{EX{\char95}Rd})) \quad \lor \quad (\mathrm{ID{\char95}reads{\char95}Rd} \ \land \ (\mathrm{ID{\char95}Rd} == \mathrm{EX{\char95}Rd})) \quad (\text{when EX instruction is } ld \text{ or } pop)$$
 * **Hardware Interlock Behavior**:
   * Hardware automatically freezes the `PC` and `IF/ID` pipeline registers for **1 clock cycle** (`stall`).
   * A bubble (`nop`) is injected into the `ID/EX` pipeline register.
